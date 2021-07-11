@@ -1,0 +1,5 @@
+PyGObject==3.40.1
+youtube_search==2.1.0
+Werkzeug==2.0.1
+pytube==10.8.5
+moviepy==1.0.3
