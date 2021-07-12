@@ -1,5 +1,7 @@
-PyGObject==3.40.1
-youtube_search==2.1.0
+pytube==10.9.2
 Werkzeug==2.0.1
-pytube==10.8.5
+PyGObject==3.40.1
 moviepy==1.0.3
+ffmpeg_python==0.2.0
+youtube_search==2.1.0
+ffmpeg==1.4

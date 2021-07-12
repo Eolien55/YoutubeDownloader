@@ -15,6 +15,13 @@ user = os.getlogin()
 from gi.repository import Gtk, GLib
 
 
+def get_resource_path(rel_path):
+    dir_of_py_file = os.path.dirname(__file__)
+    rel_path_to_resource = os.path.join(dir_of_py_file, rel_path)
+    abs_path_to_resource = os.path.abspath(rel_path_to_resource)
+    return abs_path_to_resource
+
+
 def show(title: str, text: Union[str, Exception]) -> None:
     """Function that displays a message with : a title, and a main text (title and text)"""
     title, text = str(title), str(text)
@@ -50,7 +57,7 @@ def make_format(name: str, name_second: str, path: str) -> None:
     try:
         ffmpeg.input(os.path.join(path, name)).output(
             os.path.join(path, name_second)
-        ).run()
+        ).global_args("-loglevel", "error").run()
     except:
         pass
     os.remove(os.path.join(path, name))
@@ -168,6 +175,8 @@ window = Gtk.Window()
 window.set_title("Youtube Downloader")
 window.set_title("Explications")
 window.set_wmclass("Youtube Downloader", "Youtube Downloader")
+
+window.set_icon_name("youtube-dl-gui")
 window.set_default_size(300, 0)
 window.set_resizable(False)
 
