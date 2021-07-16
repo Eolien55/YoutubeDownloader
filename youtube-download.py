@@ -14,8 +14,9 @@ user = os.getlogin()
 
 
 def get_highest_resolution(streams: StreamQuery) -> Union[Stream, tuple[Stream]]:
-    if streams.get_highest_resolution() != (
-        true_best := streams.order_by("resolution").last()
+    if (
+        streams.get_highest_resolution().resolution
+        != (true_best := streams.order_by("resolution").last()).resolution
     ):
         return (true_best, streams.order_by("abr").last())
     return true_best
