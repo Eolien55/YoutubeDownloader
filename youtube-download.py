@@ -197,7 +197,11 @@ def main(url, search, format):
         exit(1)
     thread_nb = 0
     for the_url, the_search in zip(url, search):
+        the_url.replace("+", " ")
         if the_search:
             the_url = (the_url,)
         Thread(target=rundownload, args=(the_url, "", format, thread_nb)).start()
-        thread_nb += 1
+    thread_nb += 1
+
+
+main()
