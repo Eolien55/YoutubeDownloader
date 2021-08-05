@@ -1,6 +1,5 @@
 from subprocess import PIPE, Popen
 from typing import Union
-import pytube
 from pytube import YouTube, Playlist, Stream, StreamQuery
 import os
 from html import unescape
@@ -13,18 +12,18 @@ import shutil
 user = os.getlogin()
 
 
-def get_highest_resolution(streams: StreamQuery) -> Union[Stream, tuple[Stream]]:
+def get_highest_resolution(
+    streams: StreamQuery, absolutebest: bool
+) -> Union[Stream, tuple[Stream]]:
     if (
         streams.get_highest_resolution().resolution
         != (true_best := streams.order_by("resolution").last()).resolution
-    ):
+    ) and absolutebest:
         return (true_best, streams.order_by("abr").last())
-    return true_best
+    return streams.get_highest_resolution()
 
 
-def download(
-    video: Union[Stream, tuple[Stream]], path: str, name: str, thread_nb
-) -> str:
+def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
     if type(video) == tuple:
         video_stream = video[0]
         audio_stream = video[1]
@@ -37,7 +36,7 @@ def download(
                 video_name,
                 "-i",
                 audio_name,
-                os.path.join(path, "00" + sane_file),
+                os.path.join(path, "00" + sane_file(name)) + ".mp4",
             ],
             stdin=PIPE,
             stdout=PIPE,
@@ -45,7 +44,7 @@ def download(
         )
         os.remove(video_name)
         os.remove(audio_name)
-        return os.path.join(path, "00" + sane_file)
+        return os.path.join(path, "00" + sane_file(name) + ".mp4")
 
     return video.download(path, filename=name)
 
@@ -68,7 +67,11 @@ def make_format(name: str, name_second: str, path: str) -> None:
 
 
 def rundownload(
-    link: Union[str, tuple], suffix: str = "", format: str = "mp4", thread_nb: int = 0
+    link: Union[str, tuple],
+    suffix: str = "",
+    format: str = "mp4",
+    thread_nb: int = 0,
+    absolutebest: bool = False,
 ) -> None:
     """Actual function for downloading a youtube video
 
@@ -128,7 +131,7 @@ def rundownload(
         if format != "mp4":
             name = sane_file(name).replace(".", "")
 
-        download_video = get_highest_resolution(video.streams)
+        download_video = get_highest_resolution(video.streams, absolutebest)
         print(
             f"[{thread_nb}] Let's download '{video.title}' with a resolution of '{download_video.resolution}'{' as a ' + format} !",
             "",
@@ -137,7 +140,6 @@ def rundownload(
             download_video,
             os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
             name,
-            thread_nb,
         ).strip("/")[-1]
 
         # As pytube downloads videos as mp4 files, we don't need further processing
@@ -149,6 +151,15 @@ def rundownload(
                 os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
             )
         else:
+            print(
+                os.path.join(
+                    os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix), name
+                ),
+                os.path.join(
+                    os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
+                    name_second,
+                ),
+            )
             shutil.move(
                 os.path.join(
                     os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix), name
@@ -188,8 +199,17 @@ def rundownload(
     "-f",
     help="Sets in which format the video has to be saved",
     metavar="FORMAT",
+    default="mp4",
 )
-def main(url, search, format):
+@click.option(
+    "--absolutebest/ --notabsolutebest",
+    "-a/ -b",
+    help="Sets the video to the highest quality possible (if false, it will just get (in the worse cases) an 360p video)",
+    is_flag=True,
+    default=False,
+)
+def main(url, search, format, absolutebest):
+    print(absolutebest)
     if len(search) != len(url):
         print(
             "You must have done something wrong, the amount of urls and of search/nosearch flag isn't concordant"
@@ -200,7 +220,9 @@ def main(url, search, format):
         the_url.replace("+", " ")
         if the_search:
             the_url = (the_url,)
-        Thread(target=rundownload, args=(the_url, "", format, thread_nb)).start()
+        Thread(
+            target=rundownload, args=(the_url, "", format, thread_nb, absolutebest)
+        ).start()
     thread_nb += 1
 
 
