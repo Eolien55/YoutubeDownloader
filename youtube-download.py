@@ -58,9 +58,19 @@ def make_format(name: str, name_second: str, path: str) -> None:
 
     path is the directory where both name and name_second files are"""
     try:
-        ffmpeg.input(os.path.join(path, name)).output(
-            os.path.join(path, name_second)
-        ).global_args("-loglevel", "error").run()
+        Popen(
+            [
+                "ffmpeg-bar",
+                "-i",
+                os.path.join(path, name),
+                "-loglevel",
+                "error",
+                os.path.join(path, name_second),
+            ],
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
+        )
     except:
         pass
     os.remove(os.path.join(path, name))
@@ -80,9 +90,6 @@ def rundownload(
     suffix is the sub folder, for playlist downloads, for example
 
     format is the format that the file should have"""
-
-    # Here, we use GLib.idle_add instead of a direct function call
-    # for being able to display messages in another thread
     try:
         # Check if the link is to search or to interpret as an url
         # Once we got the good url, we can just call again this function, as it will download the video
