@@ -1,15 +1,14 @@
 from subprocess import PIPE, Popen
 from typing import Union
 from pytube import YouTube, Playlist, Stream, StreamQuery
-import os
+from os import getlogin, remove, makedirs
+from os.path import join, basename, exists
 from html import unescape
 from werkzeug.utils import secure_filename as sane_file
-import ffmpeg
 from multiprocessing import Process as Thread
 import click
-import shutil
 
-user = os.getlogin()
+user = getlogin()
 
 
 def get_highest_resolution(
@@ -36,17 +35,17 @@ def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
                 video_name,
                 "-i",
                 audio_name,
-                os.path.join(path, "00" + sane_file(name)) + ".mp4",
+                join(path, "00" + sane_file(name)) + ".mp4",
             ],
             stdin=PIPE,
             stdout=PIPE,
             stderr=PIPE,
         )
-        os.remove(video_name)
-        os.remove(audio_name)
-        return os.path.basename(os.path.join(path, "00" + sane_file(name) + ".mp4"))
+        remove(video_name)
+        remove(audio_name)
+        return basename(join(path, "00" + sane_file(name) + ".mp4"))
 
-    return os.path.basename(video.download(path, filename=name))
+    return basename(video.download(path, filename=name))
 
 
 def make_format(name: str, name_second: str, path: str) -> None:
@@ -62,10 +61,10 @@ def make_format(name: str, name_second: str, path: str) -> None:
             [
                 "ffmpeg-bar",
                 "-i",
-                os.path.join(path, name),
+                join(path, name),
                 "-loglevel",
                 "error",
-                os.path.join(path, name_second),
+                join(path, name_second),
             ],
             stdin=PIPE,
             stdout=PIPE,
@@ -73,7 +72,7 @@ def make_format(name: str, name_second: str, path: str) -> None:
         )
     except:
         pass
-    os.remove(os.path.join(path, name))
+    remove(join(path, name))
 
 
 def rundownload(
@@ -121,10 +120,8 @@ def rundownload(
 
             return
 
-        if not os.path.exists(
-            os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix)
-        ):
-            os.makedirs(os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix))
+        if not exists(join(f"/home/{user}/Desktop/YoutubeVideos", suffix)):
+            makedirs(join(f"/home/{user}/Desktop/YoutubeVideos", suffix))
 
         video = YouTube(link)
 
@@ -145,7 +142,7 @@ def rundownload(
         )
         name = download(
             download_video,
-            os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
+            join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
             name,
         )
 
@@ -156,7 +153,7 @@ def rundownload(
         make_format(
             name,
             name_second,
-            os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
+            join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
         )
         print(
             f"[{thread_nb}] Done downloading '{video.title}' with a resolution of '{download_video.resolution}'{' as a ' + format} !",
@@ -198,7 +195,6 @@ def rundownload(
     default=False,
 )
 def main(url, search, format, absolutebest):
-    print(absolutebest)
     if len(search) != len(url):
         print(
             "You must have done something wrong, the amount of urls and of search/nosearch flag isn't concordant"
