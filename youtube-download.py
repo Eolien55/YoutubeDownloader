@@ -4,8 +4,8 @@ from pytube import YouTube, Playlist, Stream, StreamQuery
 from os import getlogin, remove, makedirs
 from os.path import join, basename, exists
 from html import unescape
-from werkzeug.utils import secure_filename as sane_file
-from multiprocessing import Process as Thread
+from werkzeug.utils import secure_filename
+from multiprocessing import Process
 import click
 
 user = getlogin()
@@ -26,8 +26,8 @@ def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
     if type(video) == tuple:
         video_stream = video[0]
         audio_stream = video[1]
-        video_name = video_stream.download(path, filename="0" + sane_file(name))
-        audio_name = audio_stream.download(path, filename=sane_file(name))
+        video_name = video_stream.download(path, filename=secure_filename(name))
+        audio_name = audio_stream.download(path, filename="0" + secure_filename(name))
         Popen(
             [
                 "ffmpeg-bar",
@@ -35,7 +35,7 @@ def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
                 video_name,
                 "-i",
                 audio_name,
-                join(path, "00" + sane_file(name)) + ".mp4",
+                join(path, "00" + secure_filename(name)) + ".mp4",
             ],
             stdin=PIPE,
             stdout=PIPE,
@@ -43,7 +43,7 @@ def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
         )
         remove(video_name)
         remove(audio_name)
-        return basename(join(path, "00" + sane_file(name) + ".mp4"))
+        return basename(join(path, "00" + secure_filename(name) + ".mp4"))
 
     return basename(video.download(path, filename=name))
 
@@ -133,7 +133,7 @@ def rundownload(
         # because we won't use it again. But if we did, it would be way easier to sanitize
         # the file name manually than to letting the os do it itself
         if format != "mp4":
-            name = sane_file(name).replace(".", "")
+            name = secure_filename(name).replace(".", "")
 
         download_video = get_highest_resolution(video.streams, absolutebest)
         print(
@@ -205,7 +205,7 @@ def main(url, search, format, absolutebest):
         the_url.replace("+", " ")
         if the_search:
             the_url = (the_url,)
-        Thread(
+        Process(
             target=rundownload, args=(the_url, "", format, thread_nb, absolutebest)
         ).start()
     thread_nb += 1
