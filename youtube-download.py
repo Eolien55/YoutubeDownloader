@@ -44,9 +44,9 @@ def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
         )
         os.remove(video_name)
         os.remove(audio_name)
-        return os.path.join(path, "00" + sane_file(name) + ".mp4")
+        return os.path.basename(os.path.join(path, "00" + sane_file(name) + ".mp4"))
 
-    return video.download(path, filename=name)
+    return os.path.basename(video.download(path, filename=name))
 
 
 def make_format(name: str, name_second: str, path: str) -> None:
@@ -147,35 +147,17 @@ def rundownload(
             download_video,
             os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
             name,
-        ).strip("/")[-1]
+        )
 
-        # As pytube downloads videos as mp4 files, we don't need further processing
-        # if the target format already is mp4
-        if format != "mp4":
-            make_format(
-                name,
-                name_second,
-                os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
-            )
-        else:
-            print(
-                os.path.join(
-                    os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix), name
-                ),
-                os.path.join(
-                    os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
-                    name_second,
-                ),
-            )
-            shutil.move(
-                os.path.join(
-                    os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix), name
-                ),
-                os.path.join(
-                    os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
-                    name_second,
-                ),
-            )
+        # Pytube now downloads files as mp4 files, but it doen't put the extension
+        # There also are some case where pytube downloads files as webm or not optimal codecs
+        # In such case, i just prefer using ffmpeg to re-encode the video, with the right extension name
+
+        make_format(
+            name,
+            name_second,
+            os.path.join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
+        )
         print(
             f"[{thread_nb}] Done downloading '{video.title}' with a resolution of '{download_video.resolution}'{' as a ' + format} !",
             "",
