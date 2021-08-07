@@ -1,4 +1,5 @@
-from subprocess import PIPE, Popen
+from subprocess import PIPE
+import subprocess
 from typing import Union
 from pytube import YouTube, Playlist, Stream, StreamQuery
 from os import getlogin, remove, makedirs
@@ -28,7 +29,7 @@ def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
         audio_stream = video[1]
         video_name = video_stream.download(path, filename=secure_filename(name))
         audio_name = audio_stream.download(path, filename="0" + secure_filename(name))
-        Popen(
+        subprocess.Popen(
             [
                 "ffmpeg-bar",
                 "-i",
@@ -56,22 +57,16 @@ def make_format(name: str, name_second: str, path: str) -> None:
     name_second is the name of the file once converted
 
     path is the directory where both name and name_second files are"""
-    try:
-        Popen(
-            [
-                "ffmpeg-bar",
-                "-i",
-                join(path, name),
-                "-loglevel",
-                "error",
-                join(path, name_second),
-            ],
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
-        )
-    except:
-        pass
+    subprocess.call(
+        [
+            "ffmpeg",
+            "-i",
+            join(path, name),
+            "-loglevel",
+            "error",
+            join(path, name_second),
+        ],
+    )
     remove(join(path, name))
 
 
