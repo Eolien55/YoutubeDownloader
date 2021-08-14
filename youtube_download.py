@@ -1,5 +1,5 @@
-from subprocess import call, run
-from typing import Union
+from subprocess import call
+from typing import Union, Generator
 from pytube import YouTube, Playlist, Stream, StreamQuery
 from os import getlogin, remove, makedirs
 from os.path import join, exists, dirname
@@ -9,12 +9,13 @@ from threading import Thread
 import click
 from frontend import Frontend
 
-user = getlogin()
+user: str = getlogin()
 
 
 def get_highest_resolution(
     streams: StreamQuery, absolutebest: bool
 ) -> Union[Stream, tuple[Stream]]:
+    true_best: Stream
     if (
         streams.get_highest_resolution().resolution
         != (true_best := streams.order_by("resolution").last()).resolution
@@ -27,10 +28,12 @@ def download(
     video: Union[Stream, tuple[Stream]], path: str, name: str, format: str
 ) -> str:
     if type(video) == tuple:
-        video_stream = video[0]
-        audio_stream = video[1]
-        video_name = video_stream.download(path, filename=secure_filename(name))
-        audio_name = audio_stream.download(path, filename="0" + secure_filename(name))
+        video_stream: Stream = video[0]
+        audio_stream: Stream = video[1]
+        video_name: str = video_stream.download(path, filename=secure_filename(name))
+        audio_name: str = audio_stream.download(
+            path, filename="0" + secure_filename(name)
+        )
         call(
             [
                 "ffmpeg-bar",
@@ -46,7 +49,7 @@ def download(
 
     # YouTube sometimes have videos with th wrong codecs. make_format fixes it
 
-    video_dir = dirname(video.download(path, filename=secure_filename(name)))
+    video_dir: str = dirname(video.download(path, filename=secure_filename(name)))
     make_format(secure_filename(name), name + "." + format, video_dir)
 
 
@@ -77,7 +80,8 @@ def rundownload(
     format: str = "mp4",
     thread_nb: int = 0,
     absolutebest: bool = False,
-):
+    search: bool = False,
+) -> Generator[tuple[str], None]:
     """Actual function for downloading a youtube video
 
     link can be wether a string, which is then interpreted as an url, or a tuple, and it then searches the url matching for search the content of it
@@ -88,12 +92,10 @@ def rundownload(
     try:
         # Check if the link is to search or to interpret as an url
         # Once we got the good url, we can just call again this function, as it will download the video
-        if isinstance(link, tuple):
-            from youtube_search import YoutubeSearch
-
-            results = YoutubeSearch(link[0]).to_dict()
+        if search:
+            results: list = YoutubeSearch(link[0]).to_dict()
             assert results, "Aucun résultats"
-            result = results[0]
+            result: dict = results[0]
             link = "https://youtube.com/" + result["url_suffix"]
             rundownload(link, format=format)
             return
@@ -101,11 +103,14 @@ def rundownload(
         if link.startswith("https://www.youtube.com/playlist"):
             # Here, we get the Playlist object, which contains a list of the videos' URLs
             # We then just call the same function to download them
-            playlist = Playlist(link)
+            playlist: Playlist = Playlist(link)
             yield (
                 f"[{thread_nb}] Let's download '{playlist.title}{' as ' + format} files !",
                 "",
             )
+
+            url: str
+
             for url in playlist.video_urls:
                 rundownload(url, unescape(playlist.title), format=format)
 
@@ -119,12 +124,14 @@ def rundownload(
         if not exists(join(f"/home/{user}/Desktop/YoutubeVideos", suffix)):
             makedirs(join(f"/home/{user}/Desktop/YoutubeVideos", suffix))
 
-        video = YouTube(link)
+        video: YouTube = YouTube(link)
 
         # Here, we change a little bit the video name for us to be able to download it
-        name = video.title.replace("/", "")
+        name: str = video.title.replace("/", "")
 
-        download_video = get_highest_resolution(video.streams, absolutebest)
+        download_video: Union[Stream, tuple[Stream]] = get_highest_resolution(
+            video.streams, absolutebest
+        )
         yield (
             f"[{thread_nb}] Let's download '{video.title}' with a resolution of '{download_video.resolution}'{' as a ' + format} !",
             "",
@@ -177,22 +184,30 @@ def rundownload(
     is_flag=True,
     default=False,
 )
-def maincommand(url, search, format, absolutebest):
-    if len(search) != len(url):
+def maincommand(
+    urls: tuple[str], searches: tuple[bool], format: str, absolutebest: bool
+) -> None:
+    if len(searches) != len(urls):
         print(
             "You must have done something wrong, the amount of urls and of search/nosearch flag isn't concordant"
         )
         exit(1)
-    thread_nb = 0
-    frontend = Frontend(print, rundownload)
-    for the_url, the_search in zip(url, search):
-        the_url.replace("+", " ")
-        if the_search:
-            the_url = (the_url,)
+
+    if True in searches:
+        global YoutubeSearch
+        from youtube_search import YoutubeSearch
+
+    thread_nb: int = 0
+    frontend: function = Frontend(print, rundownload)
+    url: str
+    search: bool
+    for url, the_search in zip(urls, search):
+        url.replace("+", " ")
         Thread(
-            target=frontend, args=(the_url, "", format, thread_nb, absolutebest)
+            target=frontend, args=(url, "", format, thread_nb, absolutebest, the_search)
         ).start()
-    thread_nb += 1
+
+        thread_nb += 1
 
 
 if __name__ == "__main__":

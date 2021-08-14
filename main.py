@@ -6,13 +6,13 @@ from frontend import Frontend
 
 gi.require_version("Gtk", "3.0")
 
-from gi.repository import Gtk, GLib
+from gi.overrides import Gtk, GLib
 
 
 def show(title: str, text: Any) -> None:
     """Function that displays a message with : a title, and a main text (title and text)"""
     title, text = str(title), str(text)
-    dialog = Gtk.MessageDialog(
+    dialog: Gtk.MessageDialog = Gtk.MessageDialog(
         transient_for=window,
         flags=0,
         message_type=Gtk.MessageType.INFO,
@@ -39,7 +39,7 @@ def help_me(*args) -> None:
     )
 
 
-frontend = Frontend(
+frontend: function = Frontend(
     lambda *i: GLib.idle_add(show, *i),
     rundownload,
 )
@@ -48,22 +48,24 @@ frontend = Frontend(
 def run(*args):
     """Function triggered by pressing enter in both entrys of the app. It fetches the data used to actually download the file"""
     global thread_nb
-    link = entry.get_text()
-    format = entryformat.get_text()
-    absolutebest = absolutebest_combobox.get_active()
+    link: str = entry.get_text()
+    format: str = entryformat.get_text()
+    absolutebest: bool = absolutebest_combobox.get_active()
     if not format:
         format = "mp4"
     if link.startswith("search:"):
         # Link is a tuple, for search
-        link = (link[len("search:") :],)
+        search: bool = True
 
     # Starting the function, for being able to process multiple downloads at a time
-    process = Thread(target=frontend, args=(link, "", format, thread_nb, absolutebest))
-    process.start()
+    thread: Thread = Thread(
+        target=frontend, args=(link, "", format, thread_nb, absolutebest, search)
+    )
+    thread.start()
     thread_nb += 1
 
 
-thread_nb = 0
+thread_nb: int = 0
 
 # Creating the window object and setting attributes,
 # like titles (there are several title placement)
