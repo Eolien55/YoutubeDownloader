@@ -1,13 +1,13 @@
-from subprocess import PIPE
-import subprocess
+from subprocess import call, run
 from typing import Union
 from pytube import YouTube, Playlist, Stream, StreamQuery
 from os import getlogin, remove, makedirs
-from os.path import join, basename, exists
+from os.path import join, exists, dirname
 from html import unescape
 from werkzeug.utils import secure_filename
-from multiprocessing import Process
+from threading import Thread
 import click
+from frontend import Frontend
 
 user = getlogin()
 
@@ -23,30 +23,31 @@ def get_highest_resolution(
     return streams.get_highest_resolution()
 
 
-def download(video: Union[Stream, tuple[Stream]], path: str, name: str) -> str:
+def download(
+    video: Union[Stream, tuple[Stream]], path: str, name: str, format: str
+) -> str:
     if type(video) == tuple:
         video_stream = video[0]
         audio_stream = video[1]
         video_name = video_stream.download(path, filename=secure_filename(name))
         audio_name = audio_stream.download(path, filename="0" + secure_filename(name))
-        subprocess.Popen(
+        call(
             [
                 "ffmpeg-bar",
                 "-i",
                 video_name,
                 "-i",
                 audio_name,
-                join(path, "00" + secure_filename(name)) + ".mp4",
-            ],
-            stdin=PIPE,
-            stdout=PIPE,
-            stderr=PIPE,
+                join(path, "00" + secure_filename(name)) + "." + format,
+            ]
         )
         remove(video_name)
         remove(audio_name)
-        return basename(join(path, "00" + secure_filename(name) + ".mp4"))
 
-    return basename(video.download(path, filename=name))
+    # YouTube sometimes have videos with th wrong codecs. make_format fixes it
+
+    video_dir = dirname(video.download(path, filename=secure_filename(name)))
+    make_format(secure_filename(name), name + "." + format, video_dir)
 
 
 def make_format(name: str, name_second: str, path: str) -> None:
@@ -57,7 +58,7 @@ def make_format(name: str, name_second: str, path: str) -> None:
     name_second is the name of the file once converted
 
     path is the directory where both name and name_second files are"""
-    subprocess.call(
+    call(
         [
             "ffmpeg",
             "-i",
@@ -76,7 +77,7 @@ def rundownload(
     format: str = "mp4",
     thread_nb: int = 0,
     absolutebest: bool = False,
-) -> None:
+):
     """Actual function for downloading a youtube video
 
     link can be wether a string, which is then interpreted as an url, or a tuple, and it then searches the url matching for search the content of it
@@ -101,14 +102,14 @@ def rundownload(
             # Here, we get the Playlist object, which contains a list of the videos' URLs
             # We then just call the same function to download them
             playlist = Playlist(link)
-            print(
+            yield (
                 f"[{thread_nb}] Let's download '{playlist.title}{' as ' + format} files !",
                 "",
             )
             for url in playlist.video_urls:
                 rundownload(url, unescape(playlist.title), format=format)
 
-            print(
+            yield (
                 f"[{thread_nb}] Done downloading '{playlist.title}{' as ' + format} files !",
                 "",
             )
@@ -122,41 +123,28 @@ def rundownload(
 
         # Here, we change a little bit the video name for us to be able to download it
         name = video.title.replace("/", "")
-        name_second = name + "." + format
-
-        # If the target format is mp4, we don't have to sanitize the file name
-        # because we won't use it again. But if we did, it would be way easier to sanitize
-        # the file name manually than to letting the os do it itself
-        if format != "mp4":
-            name = secure_filename(name).replace(".", "")
 
         download_video = get_highest_resolution(video.streams, absolutebest)
-        print(
+        yield (
             f"[{thread_nb}] Let's download '{video.title}' with a resolution of '{download_video.resolution}'{' as a ' + format} !",
             "",
         )
-        name = download(
+        download(
             download_video,
             join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
             name,
+            format,
         )
 
-        # Pytube now downloads files as mp4 files, but it doen't put the extension
-        # There also are some case where pytube downloads files as webm or not optimal codecs
-        # In such case, i just prefer using ffmpeg to re-encode the video, with the right extension name
-
-        make_format(
-            name,
-            name_second,
-            join(f"/home/{user}/Desktop/YoutubeVideos", suffix),
-        )
-        print(
+        yield (
             f"[{thread_nb}] Done downloading '{video.title}' with a resolution of '{download_video.resolution}'{' as a ' + format} !",
             "",
         )
     except Exception as e:
         # Showing error (probably temporary, i should make error management)
-        print(f"[{thread_nb}] Error", e)
+        yield (f"[{thread_nb}] Error " + str(e), "")
+
+    return
 
 
 @click.command()
@@ -189,21 +177,23 @@ def rundownload(
     is_flag=True,
     default=False,
 )
-def main(url, search, format, absolutebest):
+def maincommand(url, search, format, absolutebest):
     if len(search) != len(url):
         print(
             "You must have done something wrong, the amount of urls and of search/nosearch flag isn't concordant"
         )
         exit(1)
     thread_nb = 0
+    frontend = Frontend(print, rundownload)
     for the_url, the_search in zip(url, search):
         the_url.replace("+", " ")
         if the_search:
             the_url = (the_url,)
-        Process(
-            target=rundownload, args=(the_url, "", format, thread_nb, absolutebest)
+        Thread(
+            target=frontend, args=(the_url, "", format, thread_nb, absolutebest)
         ).start()
     thread_nb += 1
 
 
-main()
+if __name__ == "__main__":
+    maincommand()
