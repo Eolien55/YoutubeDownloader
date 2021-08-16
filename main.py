@@ -6,7 +6,7 @@ from frontend import Frontend
 
 gi.require_version("Gtk", "3.0")
 
-from gi.overrides import Gtk, GLib
+from gi.repository import Gtk, GLib
 
 
 def show(title: str, text: Any) -> None:
@@ -39,7 +39,7 @@ def help_me(*args) -> None:
     )
 
 
-frontend: function = Frontend(
+frontend = Frontend(
     lambda *i: GLib.idle_add(show, *i),
     rundownload,
 )
@@ -56,6 +56,8 @@ def run(*args):
     if link.startswith("search:"):
         # Link is a tuple, for search
         search: bool = True
+    else:
+        search: bool = False
 
     # Starting the function, for being able to process multiple downloads at a time
     thread: Thread = Thread(

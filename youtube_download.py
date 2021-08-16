@@ -1,5 +1,5 @@
 from subprocess import call
-from typing import Union, Generator
+from typing import Union
 from pytube import YouTube, Playlist, Stream, StreamQuery
 from os import getlogin, remove, makedirs
 from os.path import join, exists, dirname
@@ -81,7 +81,7 @@ def rundownload(
     thread_nb: int = 0,
     absolutebest: bool = False,
     search: bool = False,
-) -> Generator[tuple[str], None]:
+):
     """Actual function for downloading a youtube video
 
     link can be wether a string, which is then interpreted as an url, or a tuple, and it then searches the url matching for search the content of it
@@ -93,11 +93,13 @@ def rundownload(
         # Check if the link is to search or to interpret as an url
         # Once we got the good url, we can just call again this function, as it will download the video
         if search:
-            results: list = YoutubeSearch(link[0]).to_dict()
+            global YoutubeSearch
+            results: list = YoutubeSearch(link).to_dict()
             assert results, "Aucun résultats"
             result: dict = results[0]
             link = "https://youtube.com/" + result["url_suffix"]
-            rundownload(link, format=format)
+            for _ in rundownload(link, format=format):
+                yield _
             return
 
         if link.startswith("https://www.youtube.com/playlist"):
@@ -112,7 +114,8 @@ def rundownload(
             url: str
 
             for url in playlist.video_urls:
-                rundownload(url, unescape(playlist.title), format=format)
+                for _ in rundownload(url, unescape(playlist.title), format=format):
+                    yield _
 
             yield (
                 f"[{thread_nb}] Done downloading '{playlist.title}{' as ' + format} files !",
@@ -158,6 +161,7 @@ def rundownload(
 @click.option(
     "--url",
     "-u",
+    "urls",
     required=True,
     help="Which url to download",
     multiple=True,
@@ -166,6 +170,7 @@ def rundownload(
 @click.option(
     "--search/ --nosearch",
     "-s/ -n",
+    "searches",
     is_flag=True,
     multiple=True,
     help="Sets wether the video has to be searched for or not",
@@ -201,10 +206,10 @@ def maincommand(
     frontend: function = Frontend(print, rundownload)
     url: str
     search: bool
-    for url, the_search in zip(urls, search):
+    for url, search in zip(urls, searches):
         url.replace("+", " ")
         Thread(
-            target=frontend, args=(url, "", format, thread_nb, absolutebest, the_search)
+            target=frontend, args=(url, "", format, thread_nb, absolutebest, search)
         ).start()
 
         thread_nb += 1
@@ -212,3 +217,5 @@ def maincommand(
 
 if __name__ == "__main__":
     maincommand()
+else:
+    from youtube_search import YoutubeSearch
